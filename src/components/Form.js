@@ -16,6 +16,7 @@ export default class Form extends Component {
   static defaultProps = {
     uiSchema: {},
     liveValidate: false,
+    propsValidate: true
   }
 
   constructor(props) {
@@ -31,9 +32,10 @@ export default class Form extends Component {
     const schema = "schema" in props ? props.schema : this.props.schema;
     const uiSchema = "uiSchema" in props ? props.uiSchema : this.props.uiSchema;
     const edit = !!props.formData;
+    const propsValidate = !!props.propsValidate;
     const {definitions} = schema;
     const formData = getDefaultFormState(schema, props.formData, definitions);
-    const errors = edit ? this.validate(formData, schema) : [];
+    const errors = edit && propsValidate ? this.validate(formData, schema) : [];
     const errorSchema = toErrorSchema(errors);
     const idSchema = toIdSchema(schema, uiSchema["ui:rootFieldId"], definitions);
     return {status: "initial", formData, edit, errors, errorSchema, idSchema};
@@ -145,6 +147,7 @@ if (process.env.NODE_ENV !== "production") {
     onError: PropTypes.func,
     onSubmit: PropTypes.func,
     liveValidate: PropTypes.bool,
+	propsValidate: PropTypes.bool,
   };
 }
 
