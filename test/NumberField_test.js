@@ -1,9 +1,20 @@
-import { expect } from "chai";
-import { Simulate} from "react-addons-test-utils";
+import {expect} from "chai";
+import {Simulate} from "react-addons-test-utils";
 
-import { createFormComponent } from "./test_utils";
+import {createFormComponent, createSandbox} from "./test_utils";
+
 
 describe("NumberField", () => {
+  let sandbox;
+
+  beforeEach(() => {
+    sandbox = createSandbox();
+  });
+
+  afterEach(() => {
+    sandbox.restore();
+  });
+
   describe("TextWidget", () => {
     it("should render a string field", () => {
       const {node} = createFormComponent({schema: {
@@ -24,14 +35,20 @@ describe("NumberField", () => {
         .eql("foo");
     });
 
-    it("should render a string field with a placeholder", () => {
+    it("should render a string field with a description", () => {
       const {node} = createFormComponent({schema: {
         type: "number",
         description: "bar",
       }});
 
-      expect(node.querySelector(".field input").getAttribute("placeholder"))
+      expect(node.querySelector(".field-description").textContent)
         .eql("bar");
+    });
+
+    it("should default state value to undefined", () => {
+      const {comp} = createFormComponent({schema: {type: "number"}});
+
+      expect(comp.state.formData).eql(undefined);
     });
 
     it("should assign a default value", () => {
@@ -40,7 +57,7 @@ describe("NumberField", () => {
         default: 2,
       }});
 
-      expect(node.querySelector(".field input").getAttribute("value"))
+      expect(node.querySelector(".field input").value)
         .eql("2");
     });
 
@@ -61,7 +78,7 @@ describe("NumberField", () => {
         type: "number",
       }, formData: 2});
 
-      expect(node.querySelector(".field input").getAttribute("value"))
+      expect(node.querySelector(".field input").value)
         .eql("2");
     });
 
@@ -85,6 +102,36 @@ describe("NumberField", () => {
       expect(node.querySelector("input[type=text]").id)
         .eql("root");
     });
+
+    it("should render with trailing zeroes", () => {
+      const {node} = createFormComponent({schema: {
+        type: "number"
+      }});
+
+      Simulate.change(node.querySelector("input"), {
+        target: {value: "2."}
+      });
+      expect(node.querySelector(".field input").value)
+        .eql("2.");
+
+      Simulate.change(node.querySelector("input"), {
+        target: {value: "2.0"}
+      });
+      expect(node.querySelector(".field input").value)
+        .eql("2.0");
+
+      Simulate.change(node.querySelector("input"), {
+        target: {value: "2.00"}
+      });
+      expect(node.querySelector(".field input").value)
+        .eql("2.00");
+
+      Simulate.change(node.querySelector("input"), {
+        target: {value: "2.000"}
+      });
+      expect(node.querySelector(".field input").value)
+        .eql("2.000");
+    });
   });
 
   describe("SelectWidget", () => {
@@ -107,17 +154,6 @@ describe("NumberField", () => {
 
       expect(node.querySelector(".field label").textContent)
         .eql("foo");
-    });
-
-    it("should render a select field with a tooltip", () => {
-      const {node} = createFormComponent({schema: {
-        type: "number",
-        enum: [1, 2],
-        description: "baz",
-      }});
-
-      expect(node.querySelector(".field select").getAttribute("title"))
-        .eql("baz");
     });
 
     it("should assign a default value", () => {

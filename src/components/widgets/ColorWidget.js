@@ -3,14 +3,14 @@ import React, {PropTypes} from "react";
 import BaseInput from "./BaseInput";
 
 
-function PasswordWidget(props) {
-  return <BaseInput type="password" {...props}/>;
+function ColorWidget(props) {
+  return <BaseInput type="color" {...props}/>;
 }
 
 if (process.env.NODE_ENV !== "production") {
-  PasswordWidget.propTypes = {
+  ColorWidget.propTypes = {
     value: PropTypes.string,
   };
 }
 
-export default PasswordWidget;
+export default ColorWidget;

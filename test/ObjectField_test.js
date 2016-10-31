@@ -1,14 +1,26 @@
 import React from "react";
-import { expect } from "chai";
-import { Simulate } from "react-addons-test-utils";
+import {expect} from "chai";
+import {Simulate} from "react-addons-test-utils";
 
-import { createFormComponent } from "./test_utils";
+import {createFormComponent, createSandbox} from "./test_utils";
+
 
 describe("ObjectField", () => {
+  let sandbox;
+
+  beforeEach(() => {
+    sandbox = createSandbox();
+  });
+
+  afterEach(() => {
+    sandbox.restore();
+  });
+
   describe("schema", () => {
     const schema = {
       type: "object",
       title: "my object",
+      description: "my description",
       required: ["foo"],
       default: {
         foo: "hey",
@@ -35,16 +47,28 @@ describe("ObjectField", () => {
     it("should render a fieldset legend", () => {
       const {node} = createFormComponent({schema});
 
-      expect(node.querySelector("fieldset > legend").textContent)
-        .eql("my object");
+      const legend = node.querySelector("fieldset > legend");
+
+      expect(legend.textContent).eql("my object");
+      expect(legend.id).eql("root__title");
     });
 
     it("should render a customized title", () => {
       const CustomTitleField = ({title}) => <div id="custom">{title}</div>;
 
-      const {node} = createFormComponent({schema, TitleField: CustomTitleField});
+      const {node} = createFormComponent({schema, fields: {
+        TitleField: CustomTitleField
+      }});
       expect(node.querySelector("fieldset > #custom").textContent)
       .to.eql("my object");
+    });
+
+    it("should render a customized description", () => {
+      const CustomDescriptionField = ({description}) => <div id="custom">{description}</div>;
+
+      const {node} = createFormComponent({schema, DescriptionField: CustomDescriptionField});
+      expect(node.querySelector("fieldset > #custom").textContent)
+      .to.eql("my description");
     });
 
     it("should render a default property label", () => {
@@ -211,6 +235,51 @@ describe("ObjectField", () => {
       const ids = [].map.call(node.querySelectorAll("input[type=text]"),
         (node) => node.id);
       expect(ids).eql(["root_bar", "root_foo"]);
+    });
+  });
+
+  describe("Title", () => {
+    const TitleField = props => <div id={`title-${props.title}`}/>;
+
+    const fields = {TitleField};
+
+    it("should pass field name to TitleField if there is no title", () => {
+      const schema = {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "object",
+            "properties": {
+            }
+          }
+        }
+      };
+
+      const {node} = createFormComponent({schema, fields});
+      expect(node.querySelector("#title-object")).to.not.be.null;
+    });
+
+    it("should pass schema title to TitleField", () => {
+      const schema = {
+        "type": "object",
+        "properties": {
+        },
+        "title": "test"
+      };
+
+      const {node} = createFormComponent({schema, fields});
+      expect(node.querySelector("#title-test")).to.not.be.null;
+    });
+
+    it("should pass empty schema title to TitleField", () => {
+      const schema = {
+        "type": "object",
+        "properties": {
+        },
+        "title": ""
+      };
+      const {node} = createFormComponent({schema, fields});
+      expect(node.querySelector("#title-")).to.be.null;
     });
   });
 });

@@ -1,8 +1,25 @@
+import React from "react";
+
+
 module.exports = {
   schema: {
     title: "Widgets",
     type: "object",
     properties: {
+      stringFormats: {
+        type: "object",
+        title: "String formats",
+        properties: {
+          email: {
+            type: "string",
+            format: "email"
+          },
+          uri: {
+            type: "string",
+            format: "uri"
+          }
+        }
+      },
       boolean: {
         type: "object",
         title: "Boolean field",
@@ -32,30 +49,38 @@ module.exports = {
           textarea: {
             type: "string",
             title: "textarea"
-          }
-        }
-      },
-      stringFormats: {
-        type: "object",
-        title: "String formats",
-        properties: {
-          email: {
-            type: "string",
-            format: "email"
           },
-          uri: {
+          color: {
             type: "string",
-            format: "uri"
-          },
-          datetime: {
-            type: "string",
-            format: "date-time"
+            title: "color picker",
+            default: "#151ce6"
           }
         }
       },
       secret: {
         type: "string",
         default: "I'm a hidden string."
+      },
+      disabled: {
+        type: "string",
+        title: "A disabled field",
+        default: "I am disabled."
+      },
+      readonly: {
+        type: "string",
+        title: "A readonly field",
+        default: "I am read-only."
+      },
+      widgetOptions: {
+        title: "Custom widget with options",
+        type: "string",
+        default: "I am yellow",
+      },
+      selectWidgetOptions: {
+        title: "Custom select widget with options",
+        type: "string",
+        enum: ["foo", "bar"],
+        enumNames: ["Foo", "Bar"],
       }
     }
   },
@@ -71,13 +96,62 @@ module.exports = {
     string: {
       textarea: {
         "ui:widget": "textarea"
+      },
+      color: {
+        "ui:widget": "color"
       }
     },
     secret: {
       "ui:widget": "hidden"
-    }
+    },
+    disabled: {
+      "ui:disabled": true
+    },
+    readonly: {
+      "ui:readonly": true
+    },
+    widgetOptions: {
+      "ui:widget": {
+        component: ({value, onChange, options}) => {
+          const {backgroundColor} = options;
+          return (
+            <input className="form-control"
+              onChange={(event) => onChange(event.target.value)}
+              style={{backgroundColor}}
+              value={value} />
+          );
+        },
+        options: {
+          backgroundColor: "yellow",
+        }
+      }
+    },
+    selectWidgetOptions: {
+      "ui:widget": {
+        component: ({value, onChange, options}) => {
+          const {enumOptions, backgroundColor} = options;
+          return (
+            <select className="form-control"
+              style={{backgroundColor}}
+              value={value}
+              onChange={(event) => onChange(event.target.value)}>{
+              enumOptions.map(({label, value}, i) => {
+                return <option key={i} value={value}>{label}</option>;
+              })
+            }</select>
+          );
+        },
+        options: {
+          backgroundColor: "pink",
+        }
+      }
+    },
   },
   formData: {
+    stringFormats: {
+      email: "chuck@norris.net",
+      uri: "http://chucknorris.com/",
+    },
     boolean: {
       default: true,
       radio: true,
@@ -86,11 +160,6 @@ module.exports = {
     string: {
       default: "Hello...",
       textarea: "... World"
-    },
-    stringFormats: {
-      email: "chuck@norris.net",
-      uri: "http://chucknorris.com/",
-      datetime: new Date().toJSON(),
     },
     secret: "I'm a hidden string."
   }

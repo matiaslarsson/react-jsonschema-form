@@ -1,17 +1,21 @@
 import sinon from "sinon";
 import React from "react";
 
-import { getDefaultRegistry } from "../src/utils";
+import {getDefaultRegistry} from "../src/utils";
 import ArrayField from "../src/components/fields/ArrayField";
 import ObjectField from "../src/components/fields/ObjectField";
-import { createComponent, createFormComponent } from "./test_utils";
+import {
+  createComponent,
+  createFormComponent,
+  createSandbox
+} from "./test_utils";
 
 
 describe("Rendering performance optimizations", () => {
   var sandbox;
 
   beforeEach(() => {
-    sandbox = sinon.sandbox.create();
+    sandbox = createSandbox();
   });
 
   afterEach(() => {
@@ -91,7 +95,7 @@ describe("Rendering performance optimizations", () => {
         foo: {type: "string"}
       }
     };
-    const idSchema = {id: "root", foo: {id: "root_plop"}};
+    const idSchema = {$id: "root", foo: {$id: "root_plop"}};
 
     it("should not render if next props are equivalent", () => {
       const {comp} = createComponent(ObjectField, {

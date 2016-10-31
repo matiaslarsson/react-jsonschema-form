@@ -19,6 +19,10 @@ app.use(require("webpack-dev-middleware")(compiler, {
 
 app.use(require("webpack-hot-middleware")(compiler));
 
+app.get("/favicon.ico", function(req, res) {
+  res.status(204).end();
+});
+
 app.get("/", function(req, res) {
   res.sendFile(path.join(__dirname, "playground", "index.html"));
 });
@@ -29,5 +33,5 @@ app.listen(port, host, function(err) {
     return;
   }
 
-  console.log(`Listening at ${server}`);
+  console.log(`Listening at http://${server}`);
 });

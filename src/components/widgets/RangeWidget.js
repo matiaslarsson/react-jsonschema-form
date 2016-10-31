@@ -1,39 +1,16 @@
-import React, { PropTypes } from "react";
+import React, {PropTypes} from "react";
 
+import {rangeSpec} from "../../utils";
+import BaseInput from "./BaseInput";
 
-function rangeSpec(schema) {
-  const spec = {};
-  if (schema.multipleOf) {
-    spec.step = schema.multipleOf;
-  }
-  if (schema.minimum) {
-    spec.min = schema.minimum;
-  }
-  if (schema.maximum) {
-    spec.max = schema.maximum;
-  }
-  return spec;
-}
-
-function RangeWidget({
-  schema,
-  id,
-  placeholder,
-  value,
-  defaultValue,
-  required,
-  onChange
-}) {
+function RangeWidget(props) {
+  const {schema, value} = props;
   return (
     <div className="field-range-wrapper">
-      <input type="range"
-        id={id}
-        value={value}
-        defaultValue={defaultValue}
-        placeholder={placeholder}
-        required={required}
-        onChange={(event) => onChange(event.target.value)}
-        {...rangeSpec(schema)} />
+      <BaseInput
+        type="range"
+        {...props}
+        {...rangeSpec(schema)}/>
       <span className="range-view">{value}</span>
     </div>
   );
@@ -41,19 +18,10 @@ function RangeWidget({
 
 if (process.env.NODE_ENV !== "production") {
   RangeWidget.propTypes = {
-    schema: PropTypes.object.isRequired,
-    id: PropTypes.string.isRequired,
-    placeholder: PropTypes.string,
     value: PropTypes.oneOfType([
-      React.PropTypes.string,
-      React.PropTypes.number,
+      PropTypes.string,
+      PropTypes.number,
     ]),
-    defaultValue: PropTypes.oneOfType([
-      React.PropTypes.string,
-      React.PropTypes.number,
-    ]),
-    required: PropTypes.bool,
-    onChange: PropTypes.func,
   };
 }
 

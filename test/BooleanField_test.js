@@ -1,9 +1,21 @@
-import { expect } from "chai";
-import { Simulate } from "react-addons-test-utils";
+import React from "react";
+import {expect} from "chai";
+import {Simulate} from "react-addons-test-utils";
 
-import { createFormComponent } from "./test_utils";
+import {createFormComponent, createSandbox} from "./test_utils";
+
 
 describe("BooleanField", () => {
+  let sandbox;
+
+  beforeEach(() => {
+    sandbox = createSandbox();
+  });
+
+  afterEach(() => {
+    sandbox.restore();
+  });
+
   it("should render a boolean field", () => {
     const {node} = createFormComponent({schema: {
       type: "boolean"
@@ -43,6 +55,12 @@ describe("BooleanField", () => {
       .eql(true);
   });
 
+  it("should default state value to undefined", () => {
+    const {comp} = createFormComponent({schema: {type: "boolean"}});
+
+    expect(comp.state.formData).eql(undefined);
+  });
+
   it("should handle a change event", () => {
     const {comp, node} = createFormComponent({schema: {
       type: "boolean",
@@ -76,6 +94,24 @@ describe("BooleanField", () => {
     expect(labels).eql(["Yes", "No"]);
   });
 
+  it("should support inline radio widgets", () => {
+    const {node} = createFormComponent({
+      schema: {type: "boolean"},
+      formData: true,
+      uiSchema: {
+        "ui:widget": {
+          component: "radio",
+          options: {
+            inline: true
+          }
+        }
+      }
+    });
+
+    expect(node.querySelectorAll(".radio-inline"))
+      .to.have.length.of(2);
+  });
+
   it("should support enumNames for select", () => {
     const {node} = createFormComponent({schema: {
       type: "boolean",
@@ -94,5 +130,55 @@ describe("BooleanField", () => {
 
     expect(node.querySelector("input[type=checkbox]").id)
       .eql("root");
+  });
+
+  describe("Label", () => {
+    const Widget = props => <div id={`label-${props.label}`}/>;
+
+    const widgets = {Widget};
+
+    it("should pass field name to widget if there is no title", () => {
+      const schema = {
+        "type": "object",
+        "properties": {
+          "boolean": {
+            "type": "boolean"
+          }
+        }
+      };
+      const uiSchema = {
+        "boolean": {
+          "ui:widget": "Widget"
+        }
+      };
+
+      const {node} = createFormComponent({schema, widgets, uiSchema});
+      expect(node.querySelector("#label-boolean")).to.not.be.null;
+    });
+
+    it("should pass schema title to widget", () => {
+      const schema = {
+        "type": "boolean",
+        "title": "test"
+      };
+      const uiSchema = {
+        "ui:widget": "Widget"
+      };
+
+      const {node} = createFormComponent({schema, widgets, uiSchema});
+      expect(node.querySelector("#label-test")).to.not.be.null;
+    });
+
+    it("should pass empty schema title to widget", () => {
+      const schema = {
+        "type": "boolean",
+        "title": ""
+      };
+      const uiSchema = {
+        "ui:widget": "Widget"
+      };
+      const {node} = createFormComponent({schema, widgets, uiSchema});
+      expect(node.querySelector("#label-")).to.not.be.null;
+    });
   });
 });

@@ -1,13 +1,31 @@
-import React, { Component, PropTypes } from "react";
+import React, {Component, PropTypes} from "react";
+
+import {deepEquals} from "../../utils";
+
 
 import {
   getDefaultFormState,
   orderProperties,
   retrieveSchema,
   shouldRender,
-  getDefaultRegistry
+  getDefaultRegistry,
+  setState
 } from "../../utils";
 
+
+function objectKeysHaveChanged(formData, state) {
+  // for performance, first check for lengths
+  const newKeys = Object.keys(formData);
+  const oldKeys = Object.keys(state);
+  if (newKeys.length < oldKeys.length) {
+    return true;
+  }
+  // deep check on sorted keys
+  if (!deepEquals(newKeys.sort(), oldKeys.sort())) {
+    return true;
+  }
+  return false;
+}
 
 class ObjectField extends Component {
   static defaultProps = {
@@ -15,6 +33,9 @@ class ObjectField extends Component {
     errorSchema: {},
     idSchema: {},
     registry: getDefaultRegistry(),
+    required: false,
+    disabled: false,
+    readonly: false,
   }
 
   constructor(props) {
@@ -23,7 +44,16 @@ class ObjectField extends Component {
   }
 
   componentWillReceiveProps(nextProps) {
-    this.setState(this.getStateFromProps(nextProps));
+    const state = this.getStateFromProps(nextProps);
+    const {formData} = nextProps;
+    if (formData && objectKeysHaveChanged(formData, this.state)) {
+      // We *need* to replace state entirely here has we have received formData
+      // holding different keys (so with some removed).
+      this.state = state;
+      this.forceUpdate();
+    } else {
+      this.setState(state);
+    }
   }
 
   getStateFromProps(props) {
@@ -41,23 +71,32 @@ class ObjectField extends Component {
       schema.required.indexOf(name) !== -1;
   }
 
-  asyncSetState(state) {
-    // ensure state is propagated to parent component when it's actually set
-    this.setState(state, _ => this.props.onChange(this.state));
+  asyncSetState(state, options={validate: false}) {
+    setState(this, state, () => {
+      this.props.onChange(this.state, options);
+    });
   }
 
   onPropertyChange = (name) => {
-    return (value) => {
-      this.asyncSetState({[name]: value});
+    return (value, options) => {
+      this.asyncSetState({[name]: value}, options);
     };
   };
 
   render() {
-    const {uiSchema, errorSchema, idSchema, name} = this.props;
-    const {definitions, fields} = this.props.registry;
-    const {SchemaField, TitleField} = fields;
+    const {
+      uiSchema,
+      errorSchema,
+      idSchema,
+      name,
+      required,
+      disabled,
+      readonly
+    } = this.props;
+    const {definitions, fields, formContext} = this.props.registry;
+    const {SchemaField, TitleField, DescriptionField} = fields;
     const schema = retrieveSchema(this.props.schema, definitions);
-    const title = schema.title || name;
+    const title = (schema.title === undefined) ? name : schema.title;
     let orderedProperties;
     try {
       const properties = Object.keys(schema.properties);
@@ -75,9 +114,16 @@ class ObjectField extends Component {
     }
     return (
       <fieldset>
-        {title ? <TitleField title={title}/> : null}
+        {title ? <TitleField
+                   id={`${idSchema.$id}__title`}
+                   title={title}
+                   required={required}
+                   formContext={formContext}/> : null}
         {schema.description ?
-          <div className="field-description">{schema.description}</div> : null}
+          <DescriptionField
+            id={`${idSchema.$id}__description`}
+            description={schema.description}
+            formContext={formContext}/> : null}
         {
         orderedProperties.map((name, index) => {
           return (
@@ -90,7 +136,9 @@ class ObjectField extends Component {
               idSchema={idSchema[name]}
               formData={this.state[name]}
               onChange={this.onPropertyChange(name)}
-              registry={this.props.registry} />
+              registry={this.props.registry}
+              disabled={disabled}
+              readonly={readonly}/>
           );
         })
       }</fieldset>
@@ -107,10 +155,16 @@ if (process.env.NODE_ENV !== "production") {
     onChange: PropTypes.func.isRequired,
     formData: PropTypes.object,
     required: PropTypes.bool,
+    disabled: PropTypes.bool,
+    readonly: PropTypes.bool,
     registry: PropTypes.shape({
-      widgets: PropTypes.objectOf(PropTypes.func).isRequired,
+      widgets: PropTypes.objectOf(PropTypes.oneOfType([
+        PropTypes.func,
+        PropTypes.object,
+      ])).isRequired,
       fields: PropTypes.objectOf(PropTypes.func).isRequired,
       definitions: PropTypes.object.isRequired,
+      formContext: PropTypes.object.isRequired,
     })
   };
 }

@@ -1,4 +1,4 @@
-import React, { PropTypes } from "react";
+import React, {PropTypes} from "react";
 
 import {
   defaultFieldValue,
@@ -19,38 +19,46 @@ function StringField(props) {
     formData,
     registry,
     required,
+    disabled,
+    readonly,
+    autofocus,
     onChange
   } = props;
-  const {title, description} = schema;
-  const {widgets} = registry;
+  const {title} = schema;
+  const {widgets, formContext} = registry;
   const widget = uiSchema["ui:widget"] || schema.format;
+  const placeholder = uiSchema["ui:placeholder"] || "";
   const commonProps = {
     schema,
-    id: idSchema && idSchema.id,
-    label: title || name,
-    placeholder: description,
-    onChange,
+    id: idSchema && idSchema.$id,
+    label: (title === undefined) ? name : title,
     value: defaultFieldValue(formData, schema),
-    required: required,
-    defaultValue: schema.default,
+    onChange,
+    required,
+    disabled,
+    readonly,
+    formContext,
+    autofocus,
   };
   if (Array.isArray(schema.enum)) {
+    const enumOptions = optionsList(schema);
     if (widget) {
-      const Widget = getAlternativeWidget(schema, widget, widgets);
-      return <Widget options={optionsList(schema)} {...commonProps} />;
+      const Widget = getAlternativeWidget(schema, widget, widgets, {enumOptions});
+      return <Widget {...commonProps}/>;
     }
-    return <SelectWidget options={optionsList(schema)} {...commonProps} />;
+    return <SelectWidget options={{enumOptions}} {...commonProps}/>;
   }
   if (widget) {
     const Widget = getAlternativeWidget(schema, widget, widgets);
-    return <Widget {...commonProps} />;
+    return <Widget {...commonProps} placeholder={placeholder}/>;
   }
-  return <TextWidget {...commonProps} />;
+  return <TextWidget {...commonProps} placeholder={placeholder}/>;
 }
 
 if (process.env.NODE_ENV !== "production") {
   StringField.propTypes = {
     schema: PropTypes.object.isRequired,
+    uiSchema: PropTypes.object.isRequired,
     idSchema: PropTypes.object,
     onChange: PropTypes.func.isRequired,
     formData: PropTypes.oneOfType([
@@ -58,17 +66,28 @@ if (process.env.NODE_ENV !== "production") {
       React.PropTypes.number,
     ]),
     registry: PropTypes.shape({
-      widgets: PropTypes.objectOf(PropTypes.func).isRequired,
+      widgets: PropTypes.objectOf(PropTypes.oneOfType([
+        PropTypes.func,
+        PropTypes.object,
+      ])).isRequired,
       fields: PropTypes.objectOf(PropTypes.func).isRequired,
       definitions: PropTypes.object.isRequired,
+      formContext: PropTypes.object.isRequired,
     }),
+    formContext: PropTypes.object.isRequired,
     required: PropTypes.bool,
+    disabled: PropTypes.bool,
+    readonly: PropTypes.bool,
+    autofocus: PropTypes.bool,
   };
 }
 
 StringField.defaultProps = {
   uiSchema: {},
   registry: getDefaultRegistry(),
+  disabled: false,
+  readonly: false,
+  autofocus: false,
 };
 
 export default StringField;

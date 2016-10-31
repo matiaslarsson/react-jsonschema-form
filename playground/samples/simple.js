@@ -1,6 +1,7 @@
 module.exports = {
   schema: {
     title: "A registration form",
+    description: "A simple form example.",
     type: "object",
     required: ["firstName", "lastName"],
     properties: {
@@ -24,15 +25,13 @@ module.exports = {
         type: "string",
         title: "Password",
         minLength: 3
-      },
-      date: {
-        type: "string",
-        format: "date-time",
-        title: "Subscription date"
       }
     }
   },
   uiSchema: {
+    firstName: {
+      "ui:autofocus": true
+    },
     age: {
       "ui:widget": "updown"
     },
@@ -42,6 +41,9 @@ module.exports = {
     password: {
       "ui:widget": "password",
       "ui:help": "Hint: Make it strong!"
+    },
+    date: {
+      "ui:widget": "alt-datetime"
     }
   },
   formData: {
@@ -49,7 +51,6 @@ module.exports = {
     lastName: "Norris",
     age: 75,
     bio: "Roundhouse kicking asses since 1940",
-    password: "noneed",
-    date: new Date().toJSON()
+    password: "noneed"
   }
 };

@@ -1,16 +1,18 @@
-import { expect } from "chai";
+import {expect} from "chai";
 
 import {
   asNumber,
+  dataURItoBlob,
+  deepEquals,
   getDefaultFormState,
   isMultiSelect,
   mergeObjects,
+  pad,
+  parseDateString,
   retrieveSchema,
   shouldRender,
-  toIdSchema,
-  parseDateString,
   toDateString,
-  pad
+  toIdSchema,
 } from "../src/utils";
 
 
@@ -189,6 +191,46 @@ describe("utils", () => {
         expect(getDefaultFormState(schema, {}))
           .eql({foo: "a"});
       });
+
+      it("should map item defaults to fixed array default", () => {
+        const schema = {
+          type: "object",
+          properties: {
+            array: {
+              type: "array",
+              items: [
+                {
+                  type: "string",
+                  default: "foo"
+                },
+                {
+                  type: "number"
+                }
+              ]
+            }
+          }
+        };
+        expect(getDefaultFormState(schema, {}))
+          .eql({array: ["foo", undefined]});
+      });
+
+      it("should use schema default for referenced definitions", () => {
+        const schema = {
+          definitions: {
+            testdef: {
+              type: "object",
+              properties: {
+                foo: {type: "number"}
+              }
+            }
+          },
+          $ref: "#/definitions/testdef",
+          default: {foo: 42}
+        };
+
+        expect(getDefaultFormState(schema, undefined, schema.definitions))
+          .eql({foo: 42});
+      });
     });
   });
 
@@ -203,6 +245,15 @@ describe("utils", () => {
 
     it("should return the raw value if the input ends with a dot", () => {
       expect(asNumber("3.")).eql("3.");
+    });
+
+    it("should not convert the value to an integer if the input ends with a 0", () => {
+      // this is to allow users to input 3.07
+      expect(asNumber("3.0")).eql("3.0");
+    });
+
+    it("should allow numbers with a 0 in the first decimal place", () => {
+      expect(asNumber("3.07")).eql(3.07);
     });
   });
 
@@ -269,22 +320,62 @@ describe("utils", () => {
       };
       expect(mergeObjects(obj1, obj2)).eql(expected);
     });
+
+    describe("concatArrays option", () => {
+      it("should not concat arrays by default", () => {
+        const obj1 = {a: [1]};
+        const obj2 = {a: [2]};
+
+        expect(mergeObjects(obj1, obj2)).eql({a: [2]});
+      });
+
+      it("should concat arrays when concatArrays is true", () => {
+        const obj1 = {a: [1]};
+        const obj2 = {a: [2]};
+
+        expect(mergeObjects(obj1, obj2, true)).eql({a: [1, 2]});
+      });
+
+      it("should concat nested arrays when concatArrays is true", () => {
+        const obj1 = {a: {b: [1]}};
+        const obj2 = {a: {b: [2]}};
+
+        expect(mergeObjects(obj1, obj2, true)).eql({a: {b: [1, 2]}});
+      });
+    });
   });
 
   describe("retrieveSchema()", () => {
     it("should 'resolve' a schema which contains definitions", () => {
-      const schema = { $ref: "#/definitions/address" };
-      const address_definition = {
+      const schema = {$ref: "#/definitions/address"};
+      const address = {
         type: "object",
         properties: {
-          street_address: { type: "string" },
-          city: { type: "string" },
-          state: { type: "string" }
+          street_address: {type: "string"},
+          city: {type: "string"},
+          state: {type: "string"}
         },
         required: [ "street_address", "city", "state" ]
       };
-      const definitions = { address: address_definition };
-      expect(retrieveSchema(schema, definitions)).eql(address_definition);
+      const definitions = {address};
+
+      expect(retrieveSchema(schema, definitions))
+        .eql(address);
+    });
+
+    it("should priorize local definitions over foreign ones", () => {
+      const schema = {
+        $ref: "#/definitions/address",
+        title: "foo"
+      };
+      const address = {
+        type: "string",
+        title: "bar",
+      };
+      const definitions = {address};
+
+      expect(retrieveSchema(schema, definitions))
+        .eql({...address, title: "foo"});
     });
   });
 
@@ -374,7 +465,7 @@ describe("utils", () => {
     it("should return an idSchema for root field", () => {
       const schema = {type: "string"};
 
-      expect(toIdSchema(schema)).eql({id: "root"});
+      expect(toIdSchema(schema)).eql({$id: "root"});
     });
 
     it("should return an idSchema for nested objects", () => {
@@ -391,10 +482,10 @@ describe("utils", () => {
       };
 
       expect(toIdSchema(schema)).eql({
-        id: "root",
+        $id: "root",
         level1: {
-          id: "root_level1",
-          level2: {id: "root_level1_level2"}
+          $id: "root_level1",
+          level2: {$id: "root_level1_level2"}
         }
       });
     });
@@ -421,17 +512,41 @@ describe("utils", () => {
       };
 
       expect(toIdSchema(schema)).eql({
-        id: "root",
+        $id: "root",
         level1a: {
-          id: "root_level1a",
-          level1a2a: {id: "root_level1a_level1a2a"},
-          level1a2b: {id: "root_level1a_level1a2b"},
+          $id: "root_level1a",
+          level1a2a: {$id: "root_level1a_level1a2a"},
+          level1a2b: {$id: "root_level1a_level1a2b"},
         },
         level1b: {
-          id: "root_level1b",
-          level1b2a: {id: "root_level1b_level1b2a"},
-          level1b2b: {id: "root_level1b_level1b2b"},
+          $id: "root_level1b",
+          level1b2a: {$id: "root_level1b_level1b2a"},
+          level1b2b: {$id: "root_level1b_level1b2b"},
         },
+      });
+    });
+
+    it("schema with an id property must not corrupt the idSchema", () => {
+      const schema = {
+        type: "object",
+        properties: {
+          metadata: {
+            type: "object",
+            properties: {
+              id: {
+                type: "string"
+              }
+            },
+            required: [ "id" ]
+          }
+        }
+      };
+      expect(toIdSchema(schema)).eql({
+        $id: "root",
+        metadata: {
+          $id: "root_metadata",
+          id: {$id: "root_metadata_id"}
+        }
       });
     });
 
@@ -447,8 +562,8 @@ describe("utils", () => {
       };
 
       expect(toIdSchema(schema)).eql({
-        id: "root",
-        foo: {id: "root_foo"}
+        $id: "root",
+        foo: {$id: "root_foo"}
       });
     });
 
@@ -467,14 +582,41 @@ describe("utils", () => {
       };
 
       expect(toIdSchema(schema, undefined, schema.definitions)).eql({
-        id: "root",
-        foo: {id: "root_foo"},
-        bar: {id: "root_bar"}
+        $id: "root",
+        foo: {$id: "root_foo"},
+        bar: {$id: "root_bar"}
       });
     });
   });
 
   describe("parseDateString()", () => {
+    it("should raise on invalid JSON datetime", () => {
+      expect(() => parseDateString("plop"))
+        .to.Throw(Error, "Unable to parse");
+    });
+
+    it("should return a default object when no datetime is passed", () => {
+      expect(parseDateString()).eql({
+        "year": -1,
+        "month": -1,
+        "day": -1,
+        "hour": -1,
+        "minute": -1,
+        "second": -1,
+      });
+    });
+
+    it("should return a default object when time should not be included", () => {
+      expect(parseDateString(undefined, false)).eql({
+        "year": -1,
+        "month": -1,
+        "day": -1,
+        "hour": 0,
+        "minute": 0,
+        "second": 0,
+      });
+    });
+
     it("should parse a valid JSON datetime string", () => {
       expect(parseDateString("2016-04-05T14:01:30.182Z"))
         .eql({
@@ -487,14 +629,21 @@ describe("utils", () => {
         });
     });
 
-    it("should raise on invalid JSON datetime", () => {
-      expect(() => parseDateString("plop"))
-        .to.Throw(Error, "Unable to parse");
+    it("should exclude time when includeTime is false", () => {
+      expect(parseDateString("2016-04-05T14:01:30.182Z", false))
+        .eql({
+          "year": 2016,
+          "month": 4,
+          "day": 5,
+          "hour": 0,
+          "minute": 0,
+          "second": 0,
+        });
     });
   });
 
   describe("toDateString()", () => {
-    it("should transform an object to a valid json datetime", () => {
+    it("should transform an object to a valid json datetime if time=true", () => {
       expect(toDateString({
         "year": 2016,
         "month": 4,
@@ -505,11 +654,54 @@ describe("utils", () => {
       }))
         .eql("2016-04-05T14:01:30.000Z");
     });
+
+    it("should transform an object to a valid date string if time=false", () => {
+      expect(toDateString({
+        "year": 2016,
+        "month": 4,
+        "day": 5,
+      }, false))
+        .eql("2016-04-05");
+    });
   });
 
   describe("pad()", () => {
     it("should pad a string with 0s", () => {
       expect(pad(4, 3)).eql("004");
+    });
+  });
+
+  describe("dataURItoBlob()", () => {
+    it("should return the name of the file if present", () => {
+      const {blob, name} = dataURItoBlob("data:image/png;name=test.png;base64,VGVzdC5wbmc=");
+      expect(name).eql("test.png");
+      expect(blob).to.have.property("size").eql(8);
+      expect(blob).to.have.property("type").eql("image/png");
+    });
+
+    it("should return unknown if name is not provided", () => {
+      const {blob, name} = dataURItoBlob("data:image/png;base64,VGVzdC5wbmc=");
+      expect(name).eql("unknown");
+      expect(blob).to.have.property("size").eql(8);
+      expect(blob).to.have.property("type").eql("image/png");
+    });
+
+    it("should return ignore unsupported parameters", () => {
+      const {blob, name} = dataURItoBlob("data:image/png;unknown=foobar;name=test.png;base64,VGVzdC5wbmc=");
+      expect(name).eql("test.png");
+      expect(blob).to.have.property("size").eql(8);
+      expect(blob).to.have.property("type").eql("image/png");
+    });
+  });
+
+  describe("deepEquals()", () => {
+    // Note: deepEquals implementation being extracted from node-deeper, it's
+    // worthless to reproduce all the tests existing for it; so we focus on the
+    // behavioral differences we introduced.
+    it("should assume functions are always equivalent", () => {
+      expect(deepEquals(() => {}, () => {})).eql(true);
+      expect(deepEquals({foo(){}}, {foo(){}})).eql(true);
+      expect(deepEquals({foo: {bar(){}}}, {foo: {bar(){}}})).eql(true);
     });
   });
 });

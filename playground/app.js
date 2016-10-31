@@ -18,9 +18,27 @@ import "codemirror/theme/solarized.css";
 import "codemirror/theme/monokai.css";
 import "codemirror/theme/eclipse.css";
 
+// Patching CodeMirror#componentWillReceiveProps so it's executed synchronously
+// Ref https://github.com/mozilla-services/react-jsonschema-form/issues/174
+Codemirror.prototype.componentWillReceiveProps = function (nextProps) {
+  if (this.codeMirror &&
+      nextProps.value !== undefined &&
+      this.codeMirror.getValue() != nextProps.value) {
+    this.codeMirror.setValue(nextProps.value);
+  }
+  if (typeof nextProps.options === "object") {
+    for (var optionName in nextProps.options) {
+      if (nextProps.options.hasOwnProperty(optionName)) {
+        this.codeMirror.setOption(optionName, nextProps.options[optionName]);
+      }
+    }
+  }
+};
+
 const log = (type) => console.log.bind(console, type);
 const fromJson = (json) => JSON.parse(json);
 const toJson = (val) => JSON.stringify(val, null, 2);
+const liveValidateSchema = {type: "boolean", title: "Live validation"};
 const cmOptions = {
   theme: "default",
   height: "auto",
@@ -113,9 +131,8 @@ class GeoPosition extends Component {
 
   onChange(name) {
     return (event) => {
-      this.setState({
-        [name]: parseFloat(event.target.value)
-      }, () => this.props.onChange(this.state));
+      this.setState({[name]: parseFloat(event.target.value)});
+      setImmediate(() => this.props.onChange(this.state));
     };
   }
 
@@ -147,11 +164,11 @@ class GeoPosition extends Component {
 class Editor extends Component {
   constructor(props) {
     super(props);
-    this.state = {valid: true, code: props.code, data: fromJson(props.code)};
+    this.state = {valid: true, code: props.code};
   }
 
   componentWillReceiveProps(props) {
-    this.setState({code: props.code, data: fromJson(props.code)});
+    this.setState({valid: true, code: props.code});
   }
 
   shouldComponentUpdate(nextProps, nextState) {
@@ -159,12 +176,15 @@ class Editor extends Component {
   }
 
   onCodeChange = (code) => {
-    try {
-      this.setState({valid: true, data: fromJson(code), code});
-      this.props.onChange(this.state.data);
-    } catch(err) {
-      this.setState({valid: false, code});
-    }
+    this.setState({valid: true, code});
+    setImmediate(() => {
+      try {
+        this.props.onChange(fromJson(this.state.code));
+      } catch(err) {
+        console.error(err);
+        this.setState({valid: false, code});
+      }
+    });
   };
 
   render() {
@@ -175,8 +195,7 @@ class Editor extends Component {
       <div className="panel panel-default">
         <div className="panel-heading">
           <span className={`${cls} glyphicon glyphicon-${icon}`} />
-          {" "}
-          {title}
+          {" " + title}
         </div>
         <Codemirror
           value={this.state.code}
@@ -201,7 +220,7 @@ class Selector extends Component {
     return (event) => {
       event.preventDefault();
       this.setState({current: label});
-      this.props.onSelected(samples[label]);
+      setImmediate(() => this.props.onSelected(samples[label]));
     };
   };
 
@@ -241,18 +260,22 @@ function ThemeSelector({theme, select}) {
 class App extends Component {
   constructor(props) {
     super(props);
+    // initialize state with Simple data sample
+    const {schema, uiSchema, formData, validate} = samples.Simple;
     this.state = {
       form: false,
-      schema: {},
-      uiSchema: {},
-      formData: {},
+      schema,
+      uiSchema,
+      formData,
+      validate,
       editor: "default",
       theme: "default",
+      liveValidate: true,
     };
   }
 
   componentDidMount() {
-    this.setState({...samples.Simple, form: true});
+    this.load(samples.Simple);
   }
 
   shouldComponentUpdate(nextProps, nextState) {
@@ -272,23 +295,40 @@ class App extends Component {
   onFormDataEdited = (formData) => this.setState({formData});
 
   onThemeSelected  = (theme, {stylesheet, editor}) => {
-    // Side effect!
-    this.setState({theme, editor: editor ? editor : "default"}, _ => {
+    this.setState({theme, editor: editor ? editor : "default"});
+    setImmediate(() => {
+      // Side effect!
       document.getElementById("theme").setAttribute("href", stylesheet);
     });
   };
 
+  setLiveValidate = ({formData}) => this.setState({liveValidate: formData});
+
   onFormDataChange = ({formData}) => this.setState({formData});
 
   render() {
-    const {schema, uiSchema, formData, theme} = this.state;
+    const {
+      schema,
+      uiSchema,
+      formData,
+      liveValidate,
+      validate,
+      theme,
+      editor
+    } = this.state;
+
     return (
       <div className="container-fluid">
         <div className="page-header">
           <h1>react-jsonschema-form</h1>
           <div className="row">
-            <div className="col-sm-10">
+            <div className="col-sm-8">
               <Selector onSelected={this.load} />
+            </div>
+            <div className="col-sm-2">
+              <Form schema={liveValidateSchema}
+                    formData={liveValidate}
+                    onChange={this.setLiveValidate}><div/></Form>
             </div>
             <div className="col-sm-2">
               <ThemeSelector theme={theme} select={this.onThemeSelected} />
@@ -296,21 +336,15 @@ class App extends Component {
           </div>
         </div>
         <div className="col-sm-7">
-          <Editor title="JSONSchema"
-            theme={this.state.editor}
-            code={toJson(this.state.schema)}
+          <Editor title="JSONSchema" theme={editor} code={toJson(schema)}
             onChange={this.onSchemaEdited} />
           <div className="row">
             <div className="col-sm-6">
-              <Editor title="UISchema"
-                theme={this.state.editor}
-                code={toJson(this.state.uiSchema)}
+              <Editor title="UISchema" theme={editor} code={toJson(uiSchema)}
                 onChange={this.onUISchemaEdited} />
             </div>
             <div className="col-sm-6">
-              <Editor title="formData"
-                theme={this.state.editor}
-                code={toJson(this.state.formData)}
+              <Editor title="formData" theme={editor} code={toJson(formData)}
                 onChange={this.onFormDataEdited} />
             </div>
           </div>
@@ -318,14 +352,14 @@ class App extends Component {
         <div className="col-sm-5">
           {!this.state.form ? null :
             <Form
+              liveValidate={liveValidate}
               schema={schema}
               uiSchema={uiSchema}
               formData={formData}
               onChange={this.onFormDataChange}
               fields={{geo: GeoPosition}}
-              onError={log("errors")}>
-              <div/>
-            </Form>}
+              validate={validate}
+              onError={log("errors")} />}
         </div>
       </div>
     );
