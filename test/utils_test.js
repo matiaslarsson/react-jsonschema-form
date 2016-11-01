@@ -7,6 +7,7 @@ import {
   getDefaultFormState,
   isMultiSelect,
   mergeObjects,
+  addItem,
   pad,
   parseDateString,
   retrieveSchema,
@@ -342,6 +343,21 @@ describe("utils", () => {
 
         expect(mergeObjects(obj1, obj2, true)).eql({a: {b: [1, 2]}});
       });
+    });
+  });
+
+  describe("addItem()", () => {
+    const definitions = {};
+    const schema = { type: "array", items: { type: "number", default: 1 } };
+
+    it("should return an items array with one item", () => {
+      const items = [];
+      expect(addItem(schema, definitions, items)).eql([1]);
+    });
+
+    it("should return an items array with four items", () => {
+      const items = [3,2], itemsToAdd = 2;
+      expect(addItem(schema, definitions, items, itemsToAdd)).eql([3,2,1,1]);
     });
   });
 

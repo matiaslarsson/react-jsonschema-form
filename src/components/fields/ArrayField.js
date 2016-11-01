@@ -12,7 +12,8 @@ import {
   toIdSchema,
   shouldRender,
   getDefaultRegistry,
-  setState
+  setState,
+  addItem,
 } from "../../utils";
 import FileWidget from "./../widgets/FileWidget";
 
@@ -57,10 +58,17 @@ class ArrayField extends Component {
 
   getStateFromProps(props) {
     const formData = Array.isArray(props.formData) ? props.formData : null;
+    const {schema} = props;
     const {definitions} = this.props.registry;
-    return {
-      items: getDefaultFormState(props.schema, formData, definitions) || []
-    };
+    let items = getDefaultFormState(schema, formData, definitions) || [];
+
+    // See #134: Adding default empty array items when initializing a form
+    const {minItems} = schema;
+    if(minItems && items.length < minItems) {
+      items = addItem(schema, definitions, items, minItems - items.length);
+    }
+
+    return {items};
   }
 
   shouldComponentUpdate(nextProps, nextState) {
@@ -87,14 +95,8 @@ class ArrayField extends Component {
     const {items} = this.state;
     const {schema, registry} = this.props;
     const {definitions} = registry;
-    let itemSchema = schema.items;
-    if (isFixedItems(schema) && allowAdditionalItems(schema)) {
-      itemSchema = schema.additionalItems;
-    }
     this.asyncSetState({
-      items: items.concat([
-        getDefaultFormState(itemSchema, undefined, definitions)
-      ])
+      items: addItem(schema, definitions, items)
     });
   };
 

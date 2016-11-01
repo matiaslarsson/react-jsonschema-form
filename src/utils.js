@@ -222,6 +222,21 @@ export function mergeObjects(obj1, obj2, concatArrays = false) {
   }, acc);
 }
 
+export function addItem(schema, definitions, items, itemsToAdd = 1) {
+  let itemSchema = schema.items;
+  if (isFixedItems(schema) && allowAdditionalItems(schema)) {
+    itemSchema = schema.additionalItems;
+  }
+
+  for(let i = 0; i < itemsToAdd; i++) {
+    items = items.concat([
+      getDefaultFormState(itemSchema, undefined, definitions)
+    ]);
+  }
+
+  return items;
+}
+
 export function asNumber(value) {
   if (/\.$/.test(value)) {
     // "3." can't really be considered a number even if it parses in js. The
